@@ -189,7 +189,7 @@ public class BluenetBridge extends ReactContextBaseJavaModule implements Interva
 	private Map<String, BleDevice> _scannedDeviceMap = new HashMap<>(); // Used to determine if scans are unique
 
 	private ScannerState _scannerState = ScannerState.DISABLED;
-	private BleDeviceFilter _deviceFilter = BleDeviceFilter.anyStone;
+	private int _deviceFilter = BleDeviceFilter.ANYSTONE;
 	private boolean _isTrackingIbeacon = false;
 
 	private boolean _connectCallbackInvoked;
@@ -316,16 +316,9 @@ public class BluenetBridge extends ReactContextBaseJavaModule implements Interva
 		_bleExt = new BleExt();
 		_bleExt.setConnectTimeout(CONNECT_TIMEOUT_MS);
 		_bleExt.setNumRetries(CONNECT_NUM_RETRIES);
-		initBluetooth();
+//		initBluetooth();
 
-		// create and bind to the BleScanService
-		BleLog.getInstance().LOGi(TAG, "binding to service..");
-		Intent intent = new Intent(_reactContext, BleScanService.class);
-		Pair logLevels = getLogLevel(BleScanService.class);
-		intent.putExtra(BleScanService.EXTRA_LOG_LEVEL, (int)logLevels.first);
-		intent.putExtra(BleScanService.EXTRA_FILE_LOG_LEVEL, (int)logLevels.second);
-		boolean success = _reactContext.bindService(intent, _connection, Context.BIND_AUTO_CREATE);
-		BleLog.getInstance().LOGi(TAG, "successfully bound to service: " + success);
+		initScanner(true);
 
 		_localization = FingerprintLocalization.getInstance();
 		_isResettingBluetooth = false;
@@ -406,6 +399,19 @@ public class BluenetBridge extends ReactContextBaseJavaModule implements Interva
 				BleLog.getInstance().LOGe(TAG, "error initializing bleExt: " + error);
 			}
 		});
+	}
+
+	public void initScanner(boolean backgroundService) {
+		if (backgroundService) {
+			// create and bind to the BleScanService
+			BleLog.getInstance().LOGi(TAG, "binding to service..");
+			Intent intent = new Intent(_reactContext, BleScanService.class);
+			Pair logLevels = getLogLevel(BleScanService.class);
+			intent.putExtra(BleScanService.EXTRA_LOG_LEVEL, (int) logLevels.first);
+			intent.putExtra(BleScanService.EXTRA_FILE_LOG_LEVEL, (int) logLevels.second);
+			boolean success = _reactContext.bindService(intent, _serviceConnection, Context.BIND_AUTO_CREATE);
+			BleLog.getInstance().LOGi(TAG, "successfully bound to service: " + success);
+		}
 	}
 
     @Override
@@ -523,7 +529,7 @@ public class BluenetBridge extends ReactContextBaseJavaModule implements Interva
 	public void quitApp() {
 		BleLog.getInstance().LOGw(TAG, "quitApp");
 		if (_scanServiceIsBound) {
-			_reactContext.unbindService(_connection);
+			_reactContext.unbindService(_serviceConnection);
 			_scanServiceIsBound = false;
 		}
 		// Stop the service just to be sure?
@@ -710,7 +716,7 @@ public class BluenetBridge extends ReactContextBaseJavaModule implements Interva
 	public void startScanning() {
 		BleLog.getInstance().LOGi(TAG, "startScanning");
 		setScannerState(ScannerState.HIGH_POWER);
-		_deviceFilter = BleDeviceFilter.all;
+		_deviceFilter = BleDeviceFilter.ALL;
 		updateScanner();
 	}
 
@@ -718,7 +724,7 @@ public class BluenetBridge extends ReactContextBaseJavaModule implements Interva
 	public void startScanningForCrownstones() {
 		BleLog.getInstance().LOGi(TAG, "startScanningForCrownstones");
 		setScannerState(ScannerState.HIGH_POWER);
-		_deviceFilter = BleDeviceFilter.anyStone;
+		_deviceFilter = BleDeviceFilter.ANYSTONE;
 		updateScanner();
 	}
 
@@ -729,7 +735,7 @@ public class BluenetBridge extends ReactContextBaseJavaModule implements Interva
 		BleLog.getInstance().LOGi(TAG, "startScanningForCrownstonesUniqueOnly");
 		_scannedDeviceMap.clear();
 		setScannerState(ScannerState.UNIQUE_ONLY);
-		_deviceFilter = BleDeviceFilter.anyStone;
+		_deviceFilter = BleDeviceFilter.ANYSTONE;
 		updateScanner();
 	}
 
@@ -2272,7 +2278,7 @@ public class BluenetBridge extends ReactContextBaseJavaModule implements Interva
 		_iBeaconSphereIds.put(uuid, sphereId);
 		_iBeaconRanger.addIbeaconFilter(new BleIbeaconFilter(uuid, -1, -1));
 		setTrackingState(true);
-		_deviceFilter = BleDeviceFilter.anyStone;
+		_deviceFilter = BleDeviceFilter.ANYSTONE;
 		updateScanner();
 
 		//TODO: send event?
@@ -2301,7 +2307,7 @@ public class BluenetBridge extends ReactContextBaseJavaModule implements Interva
 		// Same as startTracking, but restore the stored list of tracked iBeacons.
 		BleLog.getInstance().LOGi(TAG, "resumeTracking");
 		setTrackingState(true);
-		_deviceFilter = BleDeviceFilter.anyStone;
+		_deviceFilter = BleDeviceFilter.ANYSTONE;
 	}
 
 	@ReactMethod
@@ -2321,12 +2327,14 @@ public class BluenetBridge extends ReactContextBaseJavaModule implements Interva
 	@ReactMethod
 	public void batterySaving(boolean enable) {
 		BleLog.getInstance().LOGi(TAG, "batterySaving: " + enable);
+		// Just beacon ranging
 		// TODO
 	}
 
 	@ReactMethod
 	public void setBackgroundScanning(boolean enable) {
 		BleLog.getInstance().LOGi(TAG, "setBackgroundScanning: " + enable);
+		// Currently only called when background scanning is disabled.
 		// TODO
 	}
 
@@ -2502,7 +2510,7 @@ public class BluenetBridge extends ReactContextBaseJavaModule implements Interva
 	}
 
 	// if the service was connected successfully, the service connection gives us access to the service
-	private ServiceConnection _connection = new ServiceConnection() {
+	private ServiceConnection _serviceConnection = new ServiceConnection() {
 		@Override
 		public void onServiceConnected(ComponentName name, IBinder service) {
 			BleLog.getInstance().LOGi(TAG, "connected to ble scan service ...");
