@@ -607,9 +607,10 @@ public class BluenetBridge extends ReactContextBaseJavaModule implements Interva
 //				return;
 //			}
 			if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
-				Intent intent = new Intent(_reactContext, BluetoothPermissionRequest.class);
-				intent.setFlags(FLAG_ACTIVITY_NEW_TASK);
-				_reactContext.startActivity(intent);
+//				Intent intent = new Intent(_reactContext, BluetoothPermissionRequest.class);
+//				intent.setFlags(FLAG_ACTIVITY_NEW_TASK);
+//				_reactContext.startActivity(intent);
+				_bleExt.requestPermissions(_reactContext.getCurrentActivity());
 			}
 		}
 
